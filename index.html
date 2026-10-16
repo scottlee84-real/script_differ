@@ -2,7 +2,7 @@
 <html lang="ko">
 <head>
   <meta charset="UTF-8">
-  <title>대본 실시간 비교 & 수정 에디터</title>
+  <title>대본 실시간 비교 & 아카이브 에디터</title>
   <!-- 텍스트 비교 오픈소스 라이브러리 (Diff.js) -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jsdiff/5.1.0/diff.min.js"></script>
   <style>
@@ -13,9 +13,23 @@
       background: #f1f3f5;
       color: #212529;
     }
-    h2 { margin-bottom: 6px; }
-    p.desc { margin-top: 0; color: #495057; font-size: 14px; margin-bottom: 16px; }
-    
+    .header-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 6px;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+    h2 { margin: 0; font-size: 22px; }
+    p.desc { margin-top: 4px; color: #495057; font-size: 13.5px; margin-bottom: 16px; }
+
+    .header-controls {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
     .grid {
       display: grid;
       grid-template-columns: 1fr 1fr;
@@ -46,11 +60,11 @@
       font-size: 12px;
       color: #868e96;
     }
-    
-    /* 입력창 및 표시창 공통 규격 (줄높이·폰트 크기 일치) */
+
+    /* 입력창 및 표시창 공통 규격 */
     textarea, .diff-box {
       width: 100%;
-      height: 380px;
+      height: 420px;
       border: 1px solid #ced4da;
       border-radius: 6px;
       padding: 12px;
@@ -104,55 +118,205 @@
       margin-right: 2px;
     }
 
-    /* 하단 버튼 */
-    .btn-edit {
+    /* 버튼 공통 */
+    .btn-action {
       font-size: 12px;
-      padding: 3px 8px;
+      padding: 5px 11px;
       border: 1px solid #ced4da;
       background: #f8f9fa;
       border-radius: 4px;
       cursor: pointer;
+      font-weight: 500;
+      transition: all 0.15s ease-in-out;
     }
-    .btn-edit:hover { background: #e9ecef; }
+    .btn-action:hover { background: #e9ecef; }
+
+    .btn-copy {
+      background: #e7f5ff;
+      border-color: #74c0fc;
+      color: #1971c2;
+    }
+    .btn-copy:hover { background: #d0ebff; }
+    .btn-copy.copied {
+      background: #d3f9d8;
+      border-color: #69db7c;
+      color: #2b8a3e;
+    }
+
+    .btn-save-item {
+      background: #ebfbee;
+      border-color: #8ce99a;
+      color: #2b8a3e;
+    }
+    .btn-save-item:hover { background: #d3f9d8; }
+
+    .btn-history {
+      background: #f3f0ff;
+      border-color: #d0bfff;
+      color: #5f3dc4;
+    }
+    .btn-history:hover { background: #e5dbff; }
+
+    .btn-reset {
+      color: #fa5252;
+      border-color: #ffc9c9;
+      background: #fff5f5;
+    }
+    .btn-reset:hover { background: #ffe3e3; }
+
+    .toggle-sync {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 12px;
+      cursor: pointer;
+      color: #495057;
+      user-select: none;
+      padding: 4px 8px;
+      background: #e9ecef;
+      border-radius: 4px;
+    }
+
+    #save-status {
+      font-size: 12px;
+      color: #2b8a3e;
+      font-weight: 500;
+    }
+
+    /* 사이드바 서랍 (저장 목록) */
+    .drawer-overlay {
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0,0,0,0.3);
+      display: none;
+      z-index: 99;
+    }
+    .drawer {
+      position: fixed;
+      top: 0; right: -420px;
+      width: 400px;
+      height: 100vh;
+      background: #fff;
+      box-shadow: -2px 0 12px rgba(0,0,0,0.15);
+      z-index: 100;
+      transition: right 0.25s ease-in-out;
+      display: flex;
+      flex-direction: column;
+      padding: 16px;
+    }
+    .drawer.open {
+      right: 0;
+    }
+    .drawer-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid #dee2e6;
+      padding-bottom: 12px;
+      margin-bottom: 12px;
+    }
+    .drawer-title { font-weight: bold; font-size: 16px; }
+    .history-list {
+      flex: 1;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .history-card {
+      border: 1px solid #dee2e6;
+      border-radius: 6px;
+      padding: 10px;
+      background: #f8f9fa;
+      transition: background 0.15s;
+    }
+    .history-card:hover { background: #e9ecef; }
+    .history-card-header {
+      display: flex;
+      justify-content: space-between;
+      font-size: 13px;
+      font-weight: bold;
+      color: #343a40;
+      margin-bottom: 4px;
+    }
+    .history-date { font-size: 11px; color: #868e96; font-weight: normal; }
+    .history-preview {
+      font-size: 12px;
+      color: #495057;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      margin-bottom: 8px;
+    }
+    .history-card-actions {
+      display: flex;
+      gap: 6px;
+      justify-content: flex-end;
+    }
+    .btn-small {
+      font-size: 11px;
+      padding: 2px 7px;
+    }
   </style>
 </head>
 <body>
 
-  <h2>대본 수정 & 실시간 비교 에디터</h2>
+  <div class="header-row">
+    <h2>대본 수정 & 실시간 비교 에디터</h2>
+    <div class="header-controls">
+      <label class="toggle-sync" title="좌우 창이 같은 비율로 함께 스크롤됩니다">
+        <input type="checkbox" id="sync-scroll-toggle" checked> 동기화 스크롤
+      </label>
+      <button class="btn-action btn-save-item" onclick="saveToHistory()">📌 현재 버전 목록에 저장</button>
+      <button class="btn-action btn-history" onclick="toggleDrawer(true)">📂 저장 목록 보기 (<span id="history-count">0</span>)</button>
+      <button class="btn-action btn-reset" onclick="resetAll()">새 대본 초기화</button>
+      <span id="save-status">💾 자동 저장 중</span>
+    </div>
+  </div>
   <p class="desc">
-    왼쪽 원본 대본에서 변경·삭제된 부분은 <strong style="color:#c92a2a;">빨간색</strong>으로 즉시 표시되며, 오른쪽 창에서 자유롭게 수정할 수 있습니다.
+    왼쪽 원본에서 변경된 부분은 <strong style="color:#c92a2a;">빨간색</strong>으로 강조됩니다. 스크롤이 양방향 동기화되며, 중요한 수정 단계는 언제든 <strong>목록에 저장</strong>하여 과거 기록을 불러올 수 있습니다.
   </p>
 
   <div class="grid">
-    <!-- 왼쪽: 수정 전 원본 (수정된 곳은 빨간색으로 표시됨) -->
+    <!-- 왼쪽: 수정 전 원본 -->
     <div class="pane">
       <div class="pane-header">
         <label>수정 전 원본 (수정된 부위 빨간색 표시)</label>
-        <button id="btn-edit-mode" class="btn-edit" onclick="toggleEditOriginal()">원본 직접 수정</button>
+        <button id="btn-edit-mode" class="btn-action" onclick="toggleEditOriginal()">원본 직접 수정</button>
       </div>
-      <!-- 평소에는 빨간색 하이라이트가 보이는 창 -->
       <div id="original-view" class="diff-box"></div>
-      <!-- 원본 텍스트를 처음 넣거나 교체할 때 쓰는 입력창 (숨김 토글 가능) -->
       <textarea id="original-input" style="display:none;" placeholder="여기에 원본 대본을 붙여넣으세요..."></textarea>
     </div>
 
-    <!-- 오른쪽: 작업창 -->
+    <!-- 오른쪽: 작업창 및 복사하기 버튼 -->
     <div class="pane">
       <div class="pane-header">
         <label for="revised-input">수정 작업창 (Revised)</label>
-        <span class="hint">타이핑 시 실시간 반영</span>
+        <button id="btn-copy" class="btn-action btn-copy" onclick="copyRevisedText()">📋 최종본 복사하기</button>
       </div>
       <textarea id="revised-input" placeholder="수정할 내용을 입력하거나 타이핑하세요..."></textarea>
     </div>
   </div>
 
-  <!-- 하단: 실시간 전체 비교 결과창 (스크롤 적용) -->
+  <!-- 하단: 실시간 전체 비교 결과창 -->
   <div class="pane">
     <div class="pane-header">
-      <label>실시간 비교 결과 통합 뷰 (세로 스크롤 탑재)</label>
+      <label>실시간 비교 결과 통합 뷰 (세로 스크롤)</label>
       <span class="hint"><span style="color:#c92a2a;text-decoration:line-through;">취소선: 원본 삭제</span> / <span style="color:#2b8a3e;font-weight:bold;">초록: 새로 추가/변경</span></span>
     </div>
-    <div id="diff-output" class="diff-box" style="height: 250px;"></div>
+    <div id="diff-output" class="diff-box" style="height: 220px;"></div>
+  </div>
+
+  <!-- 사이드바 Drawer: 저장 목록 아카이브 -->
+  <div id="drawer-overlay" class="drawer-overlay" onclick="toggleDrawer(false)"></div>
+  <div id="drawer" class="drawer">
+    <div class="drawer-header">
+      <span class="drawer-title">대본 저장 목록 (히스토리)</span>
+      <button class="btn-action" onclick="toggleDrawer(false)">✕ 닫기</button>
+    </div>
+    <div id="history-list" class="history-list">
+      <!-- 저장 목록 카드 동적 렌더링 -->
+    </div>
   </div>
 
   <script>
@@ -161,9 +325,19 @@
     const revisedInput = document.getElementById('revised-input');
     const diffOutput = document.getElementById('diff-output');
     const btnEditMode = document.getElementById('btn-edit-mode');
+    const btnCopy = document.getElementById('btn-copy');
+    const saveStatus = document.getElementById('save-status');
+    const syncScrollToggle = document.getElementById('sync-scroll-toggle');
+    const historyCount = document.getElementById('history-count');
+    const historyList = document.getElementById('history-list');
+    const drawer = document.getElementById('drawer');
+    const drawerOverlay = document.getElementById('drawer-overlay');
 
-    // 샘플 기본 대본 세팅
-    const sampleText = `씬 1: 카페 내부 (낮)
+    const STORAGE_KEY_CURRENT_ORIGINAL = 'script_editor_curr_orig';
+    const STORAGE_KEY_CURRENT_REVISED = 'script_editor_curr_rev';
+    const STORAGE_KEY_HISTORY = 'script_editor_history_list';
+
+    const defaultSample = `씬 1: 카페 내부 (낮)
 민우는 따뜻한 아메리카노를 한 모금 마시며 창밖을 응시한다.
 지수가 문을 열고 들어오며 밝은 미소를 짓는다.
 
@@ -173,10 +347,121 @@
 민우
 "아니야, 나도 방금 왔어. 앉아."`;
 
-    originalInput.value = sampleText;
-    revisedInput.value = sampleText;
+    // 1. 현재 편집 데이터 로드
+    function loadCurrentWork() {
+      const savedOrig = localStorage.getItem(STORAGE_KEY_CURRENT_ORIGINAL);
+      const savedRev = localStorage.getItem(STORAGE_KEY_CURRENT_REVISED);
 
-    // 원본 직접 입력 모드 토글 함수
+      originalInput.value = (savedOrig !== null) ? savedOrig : defaultSample;
+      revisedInput.value = (savedRev !== null) ? savedRev : defaultSample;
+      renderHistoryList();
+    }
+
+    // 2. 실시간 입력 자동 저장
+    let autoSaveTimer = null;
+    function autoSave() {
+      localStorage.setItem(STORAGE_KEY_CURRENT_ORIGINAL, originalInput.value);
+      localStorage.setItem(STORAGE_KEY_CURRENT_REVISED, revisedInput.value);
+      saveStatus.textContent = "💾 저장됨";
+      clearTimeout(autoSaveTimer);
+      autoSaveTimer = setTimeout(() => {
+        saveStatus.textContent = "💾 자동 저장 중";
+      }, 1200);
+    }
+
+    // 3. 히스토리 목록 저장 (수동 버전 스냅샷)
+    function saveToHistory() {
+      const titlePrompt = prompt("이 대본의 제목이나 메모를 입력하세요:", `버전 ${new Date().toLocaleTimeString('ko-KR')}`);
+      if (!titlePrompt) return;
+
+      const historyData = JSON.parse(localStorage.getItem(STORAGE_KEY_HISTORY) || '[]');
+      const newItem = {
+        id: Date.now(),
+        title: titlePrompt,
+        date: new Date().toLocaleString('ko-KR'),
+        original: originalInput.value,
+        revised: revisedInput.value
+      };
+
+      historyData.unshift(newItem); // 최신순 저장
+      localStorage.setItem(STORAGE_KEY_HISTORY, JSON.stringify(historyData));
+      renderHistoryList();
+      alert("목록에 저장되었습니다! 오른쪽 상단 [저장 목록 보기]에서 확인하실 수 있습니다.");
+    }
+
+    // 4. 히스토리 UI 렌더링
+    function renderHistoryList() {
+      const historyData = JSON.parse(localStorage.getItem(STORAGE_KEY_HISTORY) || '[]');
+      historyCount.textContent = historyData.length;
+      historyList.innerHTML = '';
+
+      if (historyData.length === 0) {
+        historyList.innerHTML = '<p style="font-size:13px; color:#868e96; text-align:center; margin-top:30px;">저장된 대본 기록이 없습니다.<br>상단의 [📌 현재 버전 목록에 저장]을 눌러보세요.</p>';
+        return;
+      }
+
+      historyData.forEach(item => {
+        const card = document.createElement('div');
+        card.className = 'history-card';
+        card.innerHTML = `
+          <div class="history-card-header">
+            <span>${escapeHtml(item.title)}</span>
+            <span class="history-date">${item.date}</span>
+          </div>
+          <div class="history-preview">${escapeHtml(item.revised.slice(0, 50) || '(빈 내용)')}</div>
+          <div class="history-card-actions">
+            <button class="btn-action btn-small" onclick="loadHistoryItem(${item.id})">불러오기</button>
+            <button class="btn-action btn-small btn-reset" onclick="deleteHistoryItem(${item.id})">삭제</button>
+          </div>
+        `;
+        historyList.appendChild(card);
+      });
+    }
+
+    // 목록에서 선택한 대본 불러오기
+    window.loadHistoryItem = function(id) {
+      if (!confirm("이 버전을 불러오시겠습니까? 현재 작업창의 내용이 선택한 버전으로 바뀝니다.")) return;
+      const historyData = JSON.parse(localStorage.getItem(STORAGE_KEY_HISTORY) || '[]');
+      const target = historyData.find(item => item.id === id);
+      if (target) {
+        originalInput.value = target.original;
+        revisedInput.value = target.revised;
+        autoSave();
+        updateDiff();
+        toggleDrawer(false);
+      }
+    };
+
+    // 목록에서 특정 대본 삭제
+    window.deleteHistoryItem = function(id) {
+      if (!confirm("이 저장 항목을 목록에서 완전히 삭제하시겠습니까?")) return;
+      let historyData = JSON.parse(localStorage.getItem(STORAGE_KEY_HISTORY) || '[]');
+      historyData = historyData.filter(item => item.id !== id);
+      localStorage.setItem(STORAGE_KEY_HISTORY, JSON.stringify(historyData));
+      renderHistoryList();
+    };
+
+    function toggleDrawer(open) {
+      if (open) {
+        drawer.classList.add('open');
+        drawerOverlay.style.display = 'block';
+      } else {
+        drawer.classList.remove('open');
+        drawerOverlay.style.display = 'none';
+      }
+    }
+
+    function resetAll() {
+      if (!confirm("현재 작업 중인 대본을 모두 비우고 초기화하시겠습니까? (저장 목록에 저장해 둔 내용은 유지됩니다)")) return;
+      originalInput.value = "";
+      revisedInput.value = "";
+      autoSave();
+      updateDiff();
+      if (originalInput.style.display === 'none') {
+        toggleEditOriginal();
+      }
+    }
+
     function toggleEditOriginal() {
       if (originalInput.style.display === 'none') {
         originalInput.style.display = 'block';
@@ -187,39 +472,56 @@
         originalInput.style.display = 'none';
         originalView.style.display = 'block';
         btnEditMode.textContent = '원본 직접 수정';
+        autoSave();
         updateDiff();
       }
+    }
+
+    function copyRevisedText() {
+      const textToCopy = revisedInput.value;
+      if (!textToCopy) {
+        alert("복사할 내용이 없습니다.");
+        return;
+      }
+      navigator.clipboard.writeText(textToCopy).then(() => {
+        btnCopy.textContent = "✓ 복사 완료!";
+        btnCopy.classList.add("copied");
+        setTimeout(() => {
+          btnCopy.textContent = "📋 최종본 복사하기";
+          btnCopy.classList.remove("copied");
+        }, 2000);
+      }).catch(() => {
+        revisedInput.select();
+        document.execCommand('copy');
+        btnCopy.textContent = "✓ 복사 완료!";
+        setTimeout(() => {
+          btnCopy.textContent = "📋 최종본 복사하기";
+        }, 2000);
+      });
     }
 
     function updateDiff() {
       const originalText = originalInput.value;
       const revisedText = revisedInput.value;
-
-      // 단어/공백 단위 비교 연산
       const diff = Diff.diffWordsWithSpace(originalText, revisedText);
 
-      // 1. 왼쪽 '원본 창' 업데이트 (수정·삭제된 곳 빨간색 처리)
+      // 왼쪽 원본 창
       const origFrag = document.createDocumentFragment();
       diff.forEach(part => {
-        if (part.added) {
-          // 추가된 것은 원본에 없던 내용이므로 왼쪽 원본창에는 표기하지 않음
-          return;
-        }
+        if (part.added) return;
         if (part.removed) {
-          // 수정 전 원본에서 변경/삭제된 부위 -> 빨간색 강조
           const span = document.createElement('span');
           span.className = 'orig-deleted';
           span.textContent = part.value;
           origFrag.appendChild(span);
         } else {
-          // 변경 없는 동일 부위
           origFrag.appendChild(document.createTextNode(part.value));
         }
       });
       originalView.innerHTML = '';
       originalView.appendChild(origFrag);
 
-      // 2. 하단 '실시간 결과 창' 업데이트 (삭제선 + 신규 추가 초록색)
+      // 하단 전체 비교 창
       const diffFrag = document.createDocumentFragment();
       diff.forEach(part => {
         let span;
@@ -241,11 +543,55 @@
       diffOutput.appendChild(diffFrag);
     }
 
-    // 입력 시 실시간 업데이트
-    originalInput.addEventListener('input', updateDiff);
-    revisedInput.addEventListener('input', updateDiff);
+    /* 5. 양방향 동기화 스크롤 (Sync Scroll) 로직 */
+    let isSyncingLeft = false;
+    let isSyncingRight = false;
 
-    // 초기 실행
+    // 활성 창(비교뷰 or 입력창) 선택
+    function getActiveLeftElement() {
+      return (originalInput.style.display === 'none') ? originalView : originalInput;
+    }
+
+    function syncScroll(source, target) {
+      if (!syncScrollToggle.checked) return;
+      const maxSource = source.scrollHeight - source.clientHeight;
+      const maxTarget = target.scrollHeight - target.clientHeight;
+      if (maxSource <= 0 || maxTarget <= 0) return;
+
+      const percentage = source.scrollTop / maxSource;
+      target.scrollTop = percentage * maxTarget;
+    }
+
+    function handleLeftScroll() {
+      if (isSyncingLeft) {
+        isSyncingLeft = false;
+        return;
+      }
+      isSyncingRight = true;
+      syncScroll(getActiveLeftElement(), revisedInput);
+    }
+
+    function handleRightScroll() {
+      if (isSyncingRight) {
+        isSyncingRight = false;
+        return;
+      }
+      isSyncingLeft = true;
+      syncScroll(revisedInput, getActiveLeftElement());
+    }
+
+    originalView.addEventListener('scroll', handleLeftScroll);
+    originalInput.addEventListener('scroll', handleLeftScroll);
+    revisedInput.addEventListener('scroll', handleRightScroll);
+
+    function escapeHtml(str) {
+      return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    }
+
+    originalInput.addEventListener('input', () => { autoSave(); updateDiff(); });
+    revisedInput.addEventListener('input', () => { autoSave(); updateDiff(); });
+
+    loadCurrentWork();
     updateDiff();
   </script>
 
