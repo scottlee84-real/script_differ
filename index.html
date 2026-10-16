@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <title>대본 실시간 비교 & 수정 에디터</title>
+  <!-- 텍스트 비교 오픈소스 라이브러리 (Diff.js) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jsdiff/5.1.0/diff.min.js"></script>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      margin: 20px;
+      background: #f1f3f5;
+      color: #212529;
+    }
+    h2 { margin-bottom: 6px; }
+    p.desc { margin-top: 0; color: #495057; font-size: 14px; margin-bottom: 16px; }
+    
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin-bottom: 20px;
+    }
+    .pane {
+      display: flex;
+      flex-direction: column;
+      background: #fff;
+      border-radius: 8px;
+      padding: 14px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+      border: 1px solid #dee2e6;
+    }
+    .pane-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+    .pane label {
+      font-weight: bold;
+      color: #343a40;
+      font-size: 14px;
+    }
+    .hint {
+      font-size: 12px;
+      color: #868e96;
+    }
+    
+    /* 입력창 및 표시창 공통 규격 (줄높이·폰트 크기 일치) */
+    textarea, .diff-box {
+      width: 100%;
+      height: 380px;
+      border: 1px solid #ced4da;
+      border-radius: 6px;
+      padding: 12px;
+      font-size: 14.5px;
+      line-height: 1.7;
+      font-family: inherit;
+    }
+
+    textarea {
+      resize: vertical;
+      outline: none;
+    }
+    textarea:focus {
+      border-color: #339af0;
+    }
+
+    /* 스크롤 추가 & 줄바꿈 보존 */
+    .diff-box {
+      overflow-y: auto;
+      overflow-x: hidden;
+      white-space: pre-wrap;
+      word-break: break-word;
+      background-color: #fff;
+    }
+
+    /* [원본 창] 수정/삭제된 부분 빨간색 처리 */
+    .orig-deleted {
+      background-color: #ffe3e3;
+      color: #c92a2a;
+      text-decoration: underline wavy #fa5252;
+      font-weight: 600;
+      padding: 1px 3px;
+      border-radius: 3px;
+    }
+
+    /* [결과 창] 변경사항 스타일 */
+    .diff-added {
+      background-color: #d3f9d8;
+      color: #2b8a3e;
+      text-decoration: none;
+      font-weight: 600;
+      padding: 2px 4px;
+      border-radius: 3px;
+    }
+    .diff-removed {
+      background-color: #ffe3e3;
+      color: #c92a2a;
+      text-decoration: line-through;
+      padding: 2px 4px;
+      border-radius: 3px;
+      margin-right: 2px;
+    }
+
+    /* 하단 버튼 */
+    .btn-edit {
+      font-size: 12px;
+      padding: 3px 8px;
+      border: 1px solid #ced4da;
+      background: #f8f9fa;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    .btn-edit:hover { background: #e9ecef; }
+  </style>
+</head>
+<body>
+
+  <h2>대본 수정 & 실시간 비교 에디터</h2>
+  <p class="desc">
+    왼쪽 원본 대본에서 변경·삭제된 부분은 <strong style="color:#c92a2a;">빨간색</strong>으로 즉시 표시되며, 오른쪽 창에서 자유롭게 수정할 수 있습니다.
+  </p>
+
+  <div class="grid">
+    <!-- 왼쪽: 수정 전 원본 (수정된 곳은 빨간색으로 표시됨) -->
+    <div class="pane">
+      <div class="pane-header">
+        <label>수정 전 원본 (수정된 부위 빨간색 표시)</label>
+        <button id="btn-edit-mode" class="btn-edit" onclick="toggleEditOriginal()">원본 직접 수정</button>
+      </div>
+      <!-- 평소에는 빨간색 하이라이트가 보이는 창 -->
+      <div id="original-view" class="diff-box"></div>
+      <!-- 원본 텍스트를 처음 넣거나 교체할 때 쓰는 입력창 (숨김 토글 가능) -->
+      <textarea id="original-input" style="display:none;" placeholder="여기에 원본 대본을 붙여넣으세요..."></textarea>
+    </div>
+
+    <!-- 오른쪽: 작업창 -->
+    <div class="pane">
+      <div class="pane-header">
+        <label for="revised-input">수정 작업창 (Revised)</label>
+        <span class="hint">타이핑 시 실시간 반영</span>
+      </div>
+      <textarea id="revised-input" placeholder="수정할 내용을 입력하거나 타이핑하세요..."></textarea>
+    </div>
+  </div>
+
+  <!-- 하단: 실시간 전체 비교 결과창 (스크롤 적용) -->
+  <div class="pane">
+    <div class="pane-header">
+      <label>실시간 비교 결과 통합 뷰 (세로 스크롤 탑재)</label>
+      <span class="hint"><span style="color:#c92a2a;text-decoration:line-through;">취소선: 원본 삭제</span> / <span style="color:#2b8a3e;font-weight:bold;">초록: 새로 추가/변경</span></span>
+    </div>
+    <div id="diff-output" class="diff-box" style="height: 250px;"></div>
+  </div>
+
+  <script>
+    const originalInput = document.getElementById('original-input');
+    const originalView = document.getElementById('original-view');
+    const revisedInput = document.getElementById('revised-input');
+    const diffOutput = document.getElementById('diff-output');
+    const btnEditMode = document.getElementById('btn-edit-mode');
+
+    // 샘플 기본 대본 세팅
+    const sampleText = `씬 1: 카페 내부 (낮)
+민우는 따뜻한 아메리카노를 한 모금 마시며 창밖을 응시한다.
+지수가 문을 열고 들어오며 밝은 미소를 짓는다.
+
+지수
+"오래 기다렸지? 오늘 날씨 진짜 좋다!"
+
+민우
+"아니야, 나도 방금 왔어. 앉아."`;
+
+    originalInput.value = sampleText;
+    revisedInput.value = sampleText;
+
+    // 원본 직접 입력 모드 토글 함수
+    function toggleEditOriginal() {
+      if (originalInput.style.display === 'none') {
+        originalInput.style.display = 'block';
+        originalView.style.display = 'none';
+        btnEditMode.textContent = '수정 완료 (비교 모드)';
+        originalInput.focus();
+      } else {
+        originalInput.style.display = 'none';
+        originalView.style.display = 'block';
+        btnEditMode.textContent = '원본 직접 수정';
+        updateDiff();
+      }
+    }
+
+    function updateDiff() {
+      const originalText = originalInput.value;
+      const revisedText = revisedInput.value;
+
+      // 단어/공백 단위 비교 연산
+      const diff = Diff.diffWordsWithSpace(originalText, revisedText);
+
+      // 1. 왼쪽 '원본 창' 업데이트 (수정·삭제된 곳 빨간색 처리)
+      const origFrag = document.createDocumentFragment();
+      diff.forEach(part => {
+        if (part.added) {
+          // 추가된 것은 원본에 없던 내용이므로 왼쪽 원본창에는 표기하지 않음
+          return;
+        }
+        if (part.removed) {
+          // 수정 전 원본에서 변경/삭제된 부위 -> 빨간색 강조
+          const span = document.createElement('span');
+          span.className = 'orig-deleted';
+          span.textContent = part.value;
+          origFrag.appendChild(span);
+        } else {
+          // 변경 없는 동일 부위
+          origFrag.appendChild(document.createTextNode(part.value));
+        }
+      });
+      originalView.innerHTML = '';
+      originalView.appendChild(origFrag);
+
+      // 2. 하단 '실시간 결과 창' 업데이트 (삭제선 + 신규 추가 초록색)
+      const diffFrag = document.createDocumentFragment();
+      diff.forEach(part => {
+        let span;
+        if (part.added) {
+          span = document.createElement('ins');
+          span.className = 'diff-added';
+          span.textContent = part.value;
+        } else if (part.removed) {
+          span = document.createElement('del');
+          span.className = 'diff-removed';
+          span.textContent = part.value;
+        } else {
+          span = document.createElement('span');
+          span.textContent = part.value;
+        }
+        diffFrag.appendChild(span);
+      });
+      diffOutput.innerHTML = '';
+      diffOutput.appendChild(diffFrag);
+    }
+
+    // 입력 시 실시간 업데이트
+    originalInput.addEventListener('input', updateDiff);
+    revisedInput.addEventListener('input', updateDiff);
+
+    // 초기 실행
+    updateDiff();
+  </script>
+
+</body>
+</html>
