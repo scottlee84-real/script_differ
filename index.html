@@ -55,90 +55,72 @@
       font-size: 14px;
     }
 
-    /* 컨테이너 */
-    .editor-wrapper {
-      position: relative;
+    /* 탭 전환 버튼 */
+    .tab-group {
+      display: inline-flex;
+      background: #e9ecef;
+      border-radius: 6px;
+      padding: 2px;
+    }
+    .tab-btn {
+      font-size: 12px;
+      padding: 4px 10px;
+      border: none;
+      background: transparent;
+      border-radius: 4px;
+      cursor: pointer;
+      color: #495057;
+      font-weight: 500;
+    }
+    .tab-btn.active {
+      background: #fff;
+      color: #2b8a3e;
+      font-weight: bold;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+    }
+
+    /* 본문 공통 규격 */
+    .editor-box {
       width: 100%;
       height: calc(100vh - 160px);
-      min-height: 480px;
-      border: 1px solid #ced4da;
-      border-radius: 6px;
-      background: #fff;
-      overflow: hidden;
-    }
-
-    /* 좌우 및 레이어 공통 타이포그래피 (1픽셀 오차 방지) */
-    .editor-shared {
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      margin: 0;
-      padding: 14px;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+      min-height: 500px;
+      padding: 16px;
       font-size: 15px;
-      line-height: 1.75;
-      letter-spacing: 0;
-      word-spacing: 0;
+      line-height: 1.8;
+      font-family: inherit;
       white-space: pre-wrap;
-      word-break: break-all;
-      overflow-wrap: break-word;
-      border: none;
-      border-radius: 0;
-      tab-size: 4;
+      word-break: break-word;
+      border-radius: 6px;
+      border: 1px solid #ced4da;
+      overflow-y: auto;
+      background-color: #fff;
     }
 
-    /* 왼쪽 원본 창 */
-    #original-view {
-      overflow-y: auto;
-      overflow-x: hidden;
-      color: #212529;
-    }
-    #original-input {
+    textarea.editor-box {
       resize: none;
       outline: none;
-      overflow-y: auto;
-      overflow-x: hidden;
-      color: #212529;
-      background: #fff;
+    }
+    textarea.editor-box:focus {
+      border-color: #339af0;
     }
 
-    /* 오른쪽 작업창: 백드롭 레이어 */
-    #revised-backdrop {
-      z-index: 1;
-      overflow: hidden; /* textarea 스크롤 이벤트와 동기화 */
-      color: transparent !important; /* 글자는 투명하게 숨겨 뒤에서 배경색만 노출 */
-      user-select: none;
-      pointer-events: none;
-      background-color: transparent;
-    }
-
-    /* 오른쪽 작업창: 실제 타이핑 textarea */
-    #revised-input {
-      z-index: 2;
-      resize: none;
-      outline: none;
-      overflow-y: auto;
-      overflow-x: hidden;
-      background-color: transparent;
-      color: #212529;
-      caret-color: #212529;
-    }
-
-    /* 왼쪽 원본 창: 수정·삭제된 부위 (빨간색) */
+    /* 왼쪽 원본 창: 수정·삭제된 부분 (빨간색) */
     .orig-deleted {
       background-color: #ffe3e3;
       color: #c92a2a;
       text-decoration: underline wavy #fa5252;
       font-weight: 600;
+      padding: 1px 3px;
       border-radius: 3px;
     }
 
-    /* 오른쪽 작업창: 새로 작성·수정된 부위 (초록색) */
+    /* 오른쪽 작업창: 수정·추가된 부분 (초록색) */
     .rev-added {
-      background-color: #bbf7d0 !important;
-      border-radius: 2px;
+      background-color: #d3f9d8;
+      color: #2b8a3e;
+      font-weight: 600;
+      padding: 1px 3px;
+      border-radius: 3px;
     }
 
     /* 버튼 스타일 */
@@ -295,7 +277,7 @@
     </div>
   </div>
   <p class="desc">
-    왼쪽 원본에서 변경·삭제된 문장은 <strong style="color:#c92a2a;">빨간색</strong>으로, 오른쪽 작업창에서 새로 수정한 부분은 <strong style="color:#2b8a3e;">초록색</strong>으로 정확히 글자 위에 표시됩니다.
+    왼쪽 원본에서 삭제·수정된 내용은 <strong style="color:#c92a2a;">빨간색</strong>으로 즉시 표시됩니다. 오른쪽 작업창은 <strong>[수정 입력]</strong>과 <strong>[초록색 비교 보기]</strong> 탭을 자유롭게 오가며 확인할 수 있습니다.
   </p>
 
   <div class="grid">
@@ -305,22 +287,25 @@
         <label>수정 전 원본 (<span style="color:#c92a2a;">빨간색: 수정·삭제 부위</span>)</label>
         <button id="btn-edit-mode" class="btn-action" onclick="toggleEditOriginal()">원본 직접 수정</button>
       </div>
-      <div class="editor-wrapper">
-        <div id="original-view" class="editor-shared"></div>
-        <textarea id="original-input" class="editor-shared" style="display:none;" placeholder="여기에 원본 대본을 붙여넣으세요..."></textarea>
-      </div>
+      <div id="original-view" class="editor-box"></div>
+      <textarea id="original-input" class="editor-box" style="display:none;" placeholder="여기에 원본 대본을 붙여넣으세요..."></textarea>
     </div>
 
-    <!-- 오른쪽: 수정 작업창 (완전 1:1 오버레이) -->
+    <!-- 오른쪽: 수정 작업창 (입력 모드 vs 초록색 비교 뷰 모드) -->
     <div class="pane">
       <div class="pane-header">
-        <label>수정 작업창 (<span style="color:#2b8a3e;">초록색: 새로 작성·수정 부위</span>)</label>
+        <div class="tab-group">
+          <button id="tab-edit" class="tab-btn active" onclick="switchRightTab('edit')">✏️ 수정 입력창</button>
+          <button id="tab-preview" class="tab-btn" onclick="switchRightTab('preview')">🔍 초록색 비교 보기</button>
+        </div>
         <button id="btn-copy" class="btn-action btn-copy" onclick="copyRevisedText()">📋 최종본 복사하기</button>
       </div>
-      <div class="editor-wrapper">
-        <div id="revised-backdrop" class="editor-shared"></div>
-        <textarea id="revised-input" class="editor-shared" placeholder="수정할 내용을 입력하세요..."></textarea>
-      </div>
+
+      <!-- 1. 글자 중복 없는 깨끗한 표준 텍스트에어리어 -->
+      <textarea id="revised-input" class="editor-box" placeholder="수정할 내용을 입력하세요..."></textarea>
+
+      <!-- 2. 글자 겹침 0% 완벽한 초록색 하이라이트 뷰어 -->
+      <div id="revised-preview" class="editor-box" style="display:none;"></div>
     </div>
   </div>
 
@@ -338,7 +323,9 @@
     const originalInput = document.getElementById('original-input');
     const originalView = document.getElementById('original-view');
     const revisedInput = document.getElementById('revised-input');
-    const revisedBackdrop = document.getElementById('revised-backdrop');
+    const revisedPreview = document.getElementById('revised-preview');
+    const tabEdit = document.getElementById('tab-edit');
+    const tabPreview = document.getElementById('tab-preview');
     const btnEditMode = document.getElementById('btn-edit-mode');
     const btnCopy = document.getElementById('btn-copy');
     const saveStatus = document.getElementById('save-status');
@@ -382,12 +369,32 @@
       }, 1200);
     }
 
+    // 오른쪽 탭 전환 (입력창 ↔ 초록색 하이라이트 확인)
+    function switchRightTab(mode) {
+      if (mode === 'edit') {
+        tabEdit.classList.add('active');
+        tabPreview.classList.remove('active');
+        revisedInput.style.display = 'block';
+        revisedPreview.style.display = 'none';
+        revisedInput.scrollTop = revisedPreview.scrollTop;
+        revisedInput.focus();
+      } else {
+        tabPreview.classList.add('active');
+        tabEdit.classList.remove('active');
+        revisedInput.style.display = 'none';
+        revisedPreview.style.display = 'block';
+        updateDiff();
+        revisedPreview.scrollTop = revisedInput.scrollTop;
+      }
+    }
+
+    // 비교 연산 및 렌더링
     function updateDiff() {
       const originalText = originalInput.value;
       const revisedText = revisedInput.value;
       const diff = Diff.diffWordsWithSpace(originalText, revisedText);
 
-      // 1. 왼쪽 원본 창 (빨간색)
+      // 1. 왼쪽 원본 창 (수정·삭제 빨간색)
       const origFrag = document.createDocumentFragment();
       diff.forEach(part => {
         if (part.added) return;
@@ -403,12 +410,12 @@
       originalView.innerHTML = '';
       originalView.appendChild(origFrag);
 
-      // 2. 오른쪽 백드롭 (초록색)
+      // 2. 오른쪽 미리보기 창 (추가·수정 초록색)
       const revFrag = document.createDocumentFragment();
       diff.forEach(part => {
         if (part.removed) return;
         if (part.added) {
-          const span = document.createElement('mark');
+          const span = document.createElement('span');
           span.className = 'rev-added';
           span.textContent = part.value;
           revFrag.appendChild(span);
@@ -416,25 +423,11 @@
           revFrag.appendChild(document.createTextNode(part.value));
         }
       });
-      revisedBackdrop.innerHTML = '';
-      revisedBackdrop.appendChild(revFrag);
-
-      // 개행 오차 보정
-      if (revisedText.endsWith('\n')) {
-        revisedBackdrop.appendChild(document.createTextNode('\n '));
-      }
-
-      // 백드롭 위치 즉시 동기화
-      revisedBackdrop.scrollTop = revisedInput.scrollTop;
-      revisedBackdrop.scrollLeft = revisedInput.scrollLeft;
+      revisedPreview.innerHTML = '';
+      revisedPreview.appendChild(revFrag);
     }
 
-    // 오른쪽 스크롤 이벤트
-    revisedInput.addEventListener('scroll', () => {
-      revisedBackdrop.scrollTop = revisedInput.scrollTop;
-      revisedBackdrop.scrollLeft = revisedInput.scrollLeft;
-    });
-
+    // 입력 시 실시간 업데이트
     revisedInput.addEventListener('input', () => {
       autoSave();
       updateDiff();
@@ -491,7 +484,7 @@
       const newItem = {
         id: Date.now(),
         title: titlePrompt,
-        date: new Date().toLocaleString('ko-KR'),
+        date: new Date().toLocaleTimeString('ko-KR'),
         original: originalInput.value,
         revised: revisedInput.value
       };
@@ -572,12 +565,16 @@
       }
     }
 
-    // 양방향 싱크 스크롤
+    // 양방향 동기화 스크롤
     let isSyncingLeft = false;
     let isSyncingRight = false;
 
     function getActiveLeftElement() {
       return (originalInput.style.display === 'none') ? originalView : originalInput;
+    }
+
+    function getActiveRightElement() {
+      return (revisedInput.style.display === 'none') ? revisedPreview : revisedInput;
     }
 
     function syncScroll(source, target) {
@@ -590,23 +587,22 @@
       target.scrollTop = percentage * maxTarget;
     }
 
-    originalView.addEventListener('scroll', () => {
+    function handleLeftScroll() {
       if (isSyncingLeft) { isSyncingLeft = false; return; }
       isSyncingRight = true;
-      syncScroll(getActiveLeftElement(), revisedInput);
-    });
+      syncScroll(getActiveLeftElement(), getActiveRightElement());
+    }
 
-    originalInput.addEventListener('scroll', () => {
-      if (isSyncingLeft) { isSyncingLeft = false; return; }
-      isSyncingRight = true;
-      syncScroll(getActiveLeftElement(), revisedInput);
-    });
-
-    revisedInput.addEventListener('scroll', () => {
+    function handleRightScroll() {
       if (isSyncingRight) { isSyncingRight = false; return; }
       isSyncingLeft = true;
-      syncScroll(revisedInput, getActiveLeftElement());
-    });
+      syncScroll(getActiveRightElement(), getActiveLeftElement());
+    }
+
+    originalView.addEventListener('scroll', handleLeftScroll);
+    originalInput.addEventListener('scroll', handleLeftScroll);
+    revisedInput.addEventListener('scroll', handleRightScroll);
+    revisedPreview.addEventListener('scroll', handleRightScroll);
 
     function escapeHtml(str) {
       return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
