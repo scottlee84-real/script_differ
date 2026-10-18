@@ -7,7 +7,7 @@
   <style>
     * { box-sizing: border-box; }
     body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans KR", sans-serif;
       margin: 20px;
       background: #f1f3f5;
       color: #212529;
@@ -55,60 +55,75 @@
       font-size: 14px;
     }
 
-    /* 공통 에디터 규격 (좌우 폰트 및 패딩 완전 일치) */
+    /* 컨테이너 */
     .editor-wrapper {
       position: relative;
       width: 100%;
       height: calc(100vh - 160px);
       min-height: 480px;
+      border: 1px solid #ced4da;
+      border-radius: 6px;
+      background: #fff;
+      overflow: hidden;
     }
 
-    .editor-common {
+    /* 좌우 및 레이어 공통 타이포그래피 (1픽셀 오차 방지) */
+    .editor-shared {
+      position: absolute;
+      top: 0;
+      left: 0;
       width: 100%;
       height: 100%;
+      margin: 0;
       padding: 14px;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
       font-size: 15px;
       line-height: 1.75;
-      font-family: inherit;
+      letter-spacing: 0;
+      word-spacing: 0;
       white-space: pre-wrap;
-      word-break: break-word;
-      border-radius: 6px;
-      border: 1px solid #ced4da;
-      overflow-y: auto;
-      overflow-x: hidden;
+      word-break: break-all;
+      overflow-wrap: break-word;
+      border: none;
+      border-radius: 0;
+      tab-size: 4;
     }
 
     /* 왼쪽 원본 창 */
     #original-view {
-      background: #fff;
+      overflow-y: auto;
+      overflow-x: hidden;
+      color: #212529;
     }
     #original-input {
       resize: none;
       outline: none;
-      border-color: #339af0;
+      overflow-y: auto;
+      overflow-x: hidden;
+      color: #212529;
+      background: #fff;
     }
 
-    /* 오른쪽 작업창 (오버레이 하이라이트 방식) */
+    /* 오른쪽 작업창: 백드롭 레이어 */
     #revised-backdrop {
-      position: absolute;
-      top: 0; left: 0;
-      background-color: #fff;
-      color: transparent; /* 글자는 투명하게 숨기고 배경 하이라이트 색상만 노출 */
-      pointer-events: none; /* 클릭 및 타이핑 통과 */
       z-index: 1;
+      overflow: hidden; /* textarea 스크롤 이벤트와 동기화 */
+      color: transparent !important; /* 글자는 투명하게 숨겨 뒤에서 배경색만 노출 */
+      user-select: none;
+      pointer-events: none;
+      background-color: transparent;
     }
 
+    /* 오른쪽 작업창: 실제 타이핑 textarea */
     #revised-input {
-      position: absolute;
-      top: 0; left: 0;
-      background: transparent;
-      color: #212529; /* 실제 텍스트 */
       z-index: 2;
       resize: none;
       outline: none;
-    }
-    #revised-input:focus {
-      border-color: #339af0;
+      overflow-y: auto;
+      overflow-x: hidden;
+      background-color: transparent;
+      color: #212529;
+      caret-color: #212529;
     }
 
     /* 왼쪽 원본 창: 수정·삭제된 부위 (빨간색) */
@@ -117,15 +132,13 @@
       color: #c92a2a;
       text-decoration: underline wavy #fa5252;
       font-weight: 600;
-      padding: 1px 3px;
       border-radius: 3px;
     }
 
     /* 오른쪽 작업창: 새로 작성·수정된 부위 (초록색) */
     .rev-added {
-      background-color: #d3f9d8;
-      border-radius: 3px;
-      padding: 1px 2px;
+      background-color: #bbf7d0 !important;
+      border-radius: 2px;
     }
 
     /* 버튼 스타일 */
@@ -282,7 +295,7 @@
     </div>
   </div>
   <p class="desc">
-    왼쪽 원본에서 변경·삭제된 문장은 <strong style="color:#c92a2a;">빨간색</strong>으로, 오른쪽 작업창에서 새로 수정한 부분은 <strong style="color:#2b8a3e;">초록색</strong>으로 표시됩니다. 한글 끝글자 중복 없이 원활하게 타이핑할 수 있습니다.
+    왼쪽 원본에서 변경·삭제된 문장은 <strong style="color:#c92a2a;">빨간색</strong>으로, 오른쪽 작업창에서 새로 수정한 부분은 <strong style="color:#2b8a3e;">초록색</strong>으로 정확히 글자 위에 표시됩니다.
   </p>
 
   <div class="grid">
@@ -293,20 +306,20 @@
         <button id="btn-edit-mode" class="btn-action" onclick="toggleEditOriginal()">원본 직접 수정</button>
       </div>
       <div class="editor-wrapper">
-        <div id="original-view" class="editor-common"></div>
-        <textarea id="original-input" class="editor-common" style="display:none;" placeholder="여기에 원본 대본을 붙여넣으세요..."></textarea>
+        <div id="original-view" class="editor-shared"></div>
+        <textarea id="original-input" class="editor-shared" style="display:none;" placeholder="여기에 원본 대본을 붙여넣으세요..."></textarea>
       </div>
     </div>
 
-    <!-- 오른쪽: 수정 작업창 (투명 textarea + 하이라이트 백드롭) -->
+    <!-- 오른쪽: 수정 작업창 (완전 1:1 오버레이) -->
     <div class="pane">
       <div class="pane-header">
         <label>수정 작업창 (<span style="color:#2b8a3e;">초록색: 새로 작성·수정 부위</span>)</label>
         <button id="btn-copy" class="btn-action btn-copy" onclick="copyRevisedText()">📋 최종본 복사하기</button>
       </div>
       <div class="editor-wrapper">
-        <div id="revised-backdrop" class="editor-common"></div>
-        <textarea id="revised-input" class="editor-common" placeholder="수정할 내용을 입력하세요..."></textarea>
+        <div id="revised-backdrop" class="editor-shared"></div>
+        <textarea id="revised-input" class="editor-shared" placeholder="수정할 내용을 입력하세요..."></textarea>
       </div>
     </div>
   </div>
@@ -369,13 +382,12 @@
       }, 1200);
     }
 
-    // 비교 및 하이라이트 렌더링
     function updateDiff() {
       const originalText = originalInput.value;
       const revisedText = revisedInput.value;
       const diff = Diff.diffWordsWithSpace(originalText, revisedText);
 
-      // 1. 왼쪽 원본 창 (빨간색 하이라이트)
+      // 1. 왼쪽 원본 창 (빨간색)
       const origFrag = document.createDocumentFragment();
       diff.forEach(part => {
         if (part.added) return;
@@ -391,12 +403,12 @@
       originalView.innerHTML = '';
       originalView.appendChild(origFrag);
 
-      // 2. 오른쪽 백드롭 (초록색 하이라이트)
+      // 2. 오른쪽 백드롭 (초록색)
       const revFrag = document.createDocumentFragment();
       diff.forEach(part => {
         if (part.removed) return;
         if (part.added) {
-          const span = document.createElement('span');
+          const span = document.createElement('mark');
           span.className = 'rev-added';
           span.textContent = part.value;
           revFrag.appendChild(span);
@@ -407,19 +419,22 @@
       revisedBackdrop.innerHTML = '';
       revisedBackdrop.appendChild(revFrag);
 
-      // 줄바꿈 매칭용 보정
+      // 개행 오차 보정
       if (revisedText.endsWith('\n')) {
         revisedBackdrop.appendChild(document.createTextNode('\n '));
       }
+
+      // 백드롭 위치 즉시 동기화
+      revisedBackdrop.scrollTop = revisedInput.scrollTop;
+      revisedBackdrop.scrollLeft = revisedInput.scrollLeft;
     }
 
-    // 오른쪽 입력창 스크롤과 백드롭 스크롤 일치화
+    // 오른쪽 스크롤 이벤트
     revisedInput.addEventListener('scroll', () => {
       revisedBackdrop.scrollTop = revisedInput.scrollTop;
       revisedBackdrop.scrollLeft = revisedInput.scrollLeft;
     });
 
-    // 한글 입력 중(isComposing)에도 안전하게 렌더링
     revisedInput.addEventListener('input', () => {
       autoSave();
       updateDiff();
