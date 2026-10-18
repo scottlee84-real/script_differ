@@ -2,8 +2,7 @@
 <html lang="ko">
 <head>
   <meta charset="UTF-8">
-  <title>대본 실시간 비교 & 수정 에디터</title>
-  <!-- 텍스트 비교 오픈소스 라이브러리 (Diff.js) -->
+  <title>대본 1:1 실시간 비교 에디터</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jsdiff/5.1.0/diff.min.js"></script>
   <style>
     * { box-sizing: border-box; }
@@ -30,7 +29,6 @@
       gap: 8px;
     }
 
-    /* 좌우 1:1 대칭 그리드 */
     .grid {
       display: grid;
       grid-template-columns: 1fr 1fr;
@@ -56,40 +54,64 @@
       color: #343a40;
       font-size: 14px;
     }
-    .hint {
-      font-size: 12px;
-      color: #868e96;
-    }
 
-    /* 좌우 에디터 공통 규격 (하단 창 제거로 높이 확장) */
-    .editor-box {
+    /* 공통 에디터 규격 (좌우 폰트 및 패딩 완전 일치) */
+    .editor-wrapper {
+      position: relative;
       width: 100%;
       height: calc(100vh - 160px);
       min-height: 480px;
-      border: 1px solid #ced4da;
-      border-radius: 6px;
+    }
+
+    .editor-common {
+      width: 100%;
+      height: 100%;
       padding: 14px;
       font-size: 15px;
       line-height: 1.75;
       font-family: inherit;
-      overflow-y: auto;
-      overflow-x: hidden;
       white-space: pre-wrap;
       word-break: break-word;
+      border-radius: 6px;
+      border: 1px solid #ced4da;
+      overflow-y: auto;
+      overflow-x: hidden;
+    }
+
+    /* 왼쪽 원본 창 */
+    #original-view {
+      background: #fff;
+    }
+    #original-input {
+      resize: none;
+      outline: none;
+      border-color: #339af0;
+    }
+
+    /* 오른쪽 작업창 (오버레이 하이라이트 방식) */
+    #revised-backdrop {
+      position: absolute;
+      top: 0; left: 0;
       background-color: #fff;
+      color: transparent; /* 글자는 투명하게 숨기고 배경 하이라이트 색상만 노출 */
+      pointer-events: none; /* 클릭 및 타이핑 통과 */
+      z-index: 1;
+    }
+
+    #revised-input {
+      position: absolute;
+      top: 0; left: 0;
+      background: transparent;
+      color: #212529; /* 실제 텍스트 */
+      z-index: 2;
+      resize: none;
       outline: none;
     }
-    .editor-box:focus {
+    #revised-input:focus {
       border-color: #339af0;
     }
 
-    /* 원본 직접 입력용 숨김 textarea */
-    textarea.raw-textarea {
-      resize: none;
-      border-color: #339af0;
-    }
-
-    /* [왼쪽 원본 창] 삭제·수정된 부위 -> 빨간색 강조 */
+    /* 왼쪽 원본 창: 수정·삭제된 부위 (빨간색) */
     .orig-deleted {
       background-color: #ffe3e3;
       color: #c92a2a;
@@ -99,13 +121,11 @@
       border-radius: 3px;
     }
 
-    /* [오른쪽 수정 창] 새로 추가·수정된 부위 -> 초록색 강조 */
+    /* 오른쪽 작업창: 새로 작성·수정된 부위 (초록색) */
     .rev-added {
       background-color: #d3f9d8;
-      color: #2b8a3e;
-      font-weight: 600;
-      padding: 1px 3px;
       border-radius: 3px;
+      padding: 1px 2px;
     }
 
     /* 버튼 스타일 */
@@ -173,7 +193,7 @@
       font-weight: 500;
     }
 
-    /* 사이드바 히스토리 Drawer */
+    /* 사이드바 Drawer */
     .drawer-overlay {
       position: fixed;
       top: 0; left: 0; right: 0; bottom: 0;
@@ -262,7 +282,7 @@
     </div>
   </div>
   <p class="desc">
-    왼쪽 원본에서 삭제·수정된 문장은 <strong style="color:#c92a2a;">빨간색</strong>으로, 오른쪽 작업창에서 새로 수정한 부분은 <strong style="color:#2b8a3e;">초록색</strong>으로 표시됩니다.
+    왼쪽 원본에서 변경·삭제된 문장은 <strong style="color:#c92a2a;">빨간색</strong>으로, 오른쪽 작업창에서 새로 수정한 부분은 <strong style="color:#2b8a3e;">초록색</strong>으로 표시됩니다. 한글 끝글자 중복 없이 원활하게 타이핑할 수 있습니다.
   </p>
 
   <div class="grid">
@@ -272,22 +292,26 @@
         <label>수정 전 원본 (<span style="color:#c92a2a;">빨간색: 수정·삭제 부위</span>)</label>
         <button id="btn-edit-mode" class="btn-action" onclick="toggleEditOriginal()">원본 직접 수정</button>
       </div>
-      <div id="original-view" class="editor-box"></div>
-      <textarea id="original-input" class="editor-box raw-textarea" style="display:none;" placeholder="여기에 원본 대본을 붙여넣으세요..."></textarea>
+      <div class="editor-wrapper">
+        <div id="original-view" class="editor-common"></div>
+        <textarea id="original-input" class="editor-common" style="display:none;" placeholder="여기에 원본 대본을 붙여넣으세요..."></textarea>
+      </div>
     </div>
 
-    <!-- 오른쪽: 수정 작업창 -->
+    <!-- 오른쪽: 수정 작업창 (투명 textarea + 하이라이트 백드롭) -->
     <div class="pane">
       <div class="pane-header">
         <label>수정 작업창 (<span style="color:#2b8a3e;">초록색: 새로 작성·수정 부위</span>)</label>
         <button id="btn-copy" class="btn-action btn-copy" onclick="copyRevisedText()">📋 최종본 복사하기</button>
       </div>
-      <!-- contenteditable 에디터: 실시간 초록색 하이라이트 적용 -->
-      <div id="revised-view" class="editor-box" contenteditable="true" spellcheck="false" placeholder="수정할 내용을 입력하세요..."></div>
+      <div class="editor-wrapper">
+        <div id="revised-backdrop" class="editor-common"></div>
+        <textarea id="revised-input" class="editor-common" placeholder="수정할 내용을 입력하세요..."></textarea>
+      </div>
     </div>
   </div>
 
-  <!-- 사이드바 Drawer: 저장 목록 아카이브 -->
+  <!-- 히스토리 Drawer -->
   <div id="drawer-overlay" class="drawer-overlay" onclick="toggleDrawer(false)"></div>
   <div id="drawer" class="drawer">
     <div class="drawer-header">
@@ -300,7 +324,8 @@
   <script>
     const originalInput = document.getElementById('original-input');
     const originalView = document.getElementById('original-view');
-    const revisedView = document.getElementById('revised-view');
+    const revisedInput = document.getElementById('revised-input');
+    const revisedBackdrop = document.getElementById('revised-backdrop');
     const btnEditMode = document.getElementById('btn-edit-mode');
     const btnCopy = document.getElementById('btn-copy');
     const saveStatus = document.getElementById('save-status');
@@ -324,21 +349,19 @@
 민우
 "아니야, 나도 방금 왔어. 앉아."`;
 
-    // 1. 초기 로드
     function loadCurrentWork() {
       const savedOrig = localStorage.getItem(STORAGE_KEY_CURRENT_ORIGINAL);
       const savedRev = localStorage.getItem(STORAGE_KEY_CURRENT_REVISED);
 
       originalInput.value = (savedOrig !== null) ? savedOrig : defaultSample;
-      setEditorText(revisedView, (savedRev !== null) ? savedRev : defaultSample);
+      revisedInput.value = (savedRev !== null) ? savedRev : defaultSample;
       renderHistoryList();
     }
 
-    // 2. 자동 저장
     let autoSaveTimer = null;
     function autoSave() {
       localStorage.setItem(STORAGE_KEY_CURRENT_ORIGINAL, originalInput.value);
-      localStorage.setItem(STORAGE_KEY_CURRENT_REVISED, getEditorText(revisedView));
+      localStorage.setItem(STORAGE_KEY_CURRENT_REVISED, revisedInput.value);
       saveStatus.textContent = "💾 저장됨";
       clearTimeout(autoSaveTimer);
       autoSaveTimer = setTimeout(() => {
@@ -346,62 +369,13 @@
       }, 1200);
     }
 
-    // 3. 텍스트 추출/주입 유틸
-    function getEditorText(element) {
-      return element.innerText.replace(/\r\n/g, '\n');
-    }
-
-    function setEditorText(element, text) {
-      element.innerText = text;
-    }
-
-    // 4. 캐럿(커서) 위치 저장 및 복원 (contenteditable 하이라이트 시 포커스 튕김 방지)
-    function saveCaretPosition(context) {
-      const selection = window.getSelection();
-      if (!selection.rangeCount) return 0;
-      const range = selection.getRangeAt(0);
-      const preRange = range.cloneRange();
-      preRange.selectNodeContents(context);
-      preRange.setEnd(range.startContainer, range.startOffset);
-      return preRange.toString().length;
-    }
-
-    function restoreCaretPosition(context, targetPos) {
-      const selection = window.getSelection();
-      let charCount = 0;
-      const nodeStack = [context];
-      let node;
-      let found = false;
-
-      while (!found && (node = nodeStack.pop())) {
-        if (node.nodeType === 3) {
-          const nextCharCount = charCount + node.length;
-          if (targetPos <= nextCharCount) {
-            const range = document.createRange();
-            range.setStart(node, Math.max(0, targetPos - charCount));
-            range.collapse(true);
-            selection.removeAllRanges();
-            selection.addRange(range);
-            found = true;
-          }
-          charCount = nextCharCount;
-        } else {
-          let i = node.childNodes.length;
-          while (i--) {
-            nodeStack.push(node.childNodes[i]);
-          }
-        }
-      }
-    }
-
-    // 5. 실시간 Diff 렌더링
-    // leftOnly: 오른쪽 창 타이핑 중일 때는 커서 유지를 위해 왼쪽 원본 창만 즉시 갱신
-    function updateDiff(leftOnly = false) {
+    // 비교 및 하이라이트 렌더링
+    function updateDiff() {
       const originalText = originalInput.value;
-      const revisedText = getEditorText(revisedView);
+      const revisedText = revisedInput.value;
       const diff = Diff.diffWordsWithSpace(originalText, revisedText);
 
-      // (1) 왼쪽 원본 창: 삭제/수정된 문장 -> 빨간색 하이라이트
+      // 1. 왼쪽 원본 창 (빨간색 하이라이트)
       const origFrag = document.createDocumentFragment();
       diff.forEach(part => {
         if (part.added) return;
@@ -417,42 +391,45 @@
       originalView.innerHTML = '';
       originalView.appendChild(origFrag);
 
-      // (2) 오른쪽 수정 작업창: 새로 추가/수정된 부분 -> 초록색 하이라이트
-      if (!leftOnly) {
-        const caretOffset = saveCaretPosition(revisedView);
-        const revFrag = document.createDocumentFragment();
+      // 2. 오른쪽 백드롭 (초록색 하이라이트)
+      const revFrag = document.createDocumentFragment();
+      diff.forEach(part => {
+        if (part.removed) return;
+        if (part.added) {
+          const span = document.createElement('span');
+          span.className = 'rev-added';
+          span.textContent = part.value;
+          revFrag.appendChild(span);
+        } else {
+          revFrag.appendChild(document.createTextNode(part.value));
+        }
+      });
+      revisedBackdrop.innerHTML = '';
+      revisedBackdrop.appendChild(revFrag);
 
-        diff.forEach(part => {
-          if (part.removed) return;
-          if (part.added) {
-            const span = document.createElement('span');
-            span.className = 'rev-added';
-            span.textContent = part.value;
-            revFrag.appendChild(span);
-          } else {
-            revFrag.appendChild(document.createTextNode(part.value));
-          }
-        });
-
-        revisedView.innerHTML = '';
-        revisedView.appendChild(revFrag);
-        restoreCaretPosition(revisedView, caretOffset);
+      // 줄바꿈 매칭용 보정
+      if (revisedText.endsWith('\n')) {
+        revisedBackdrop.appendChild(document.createTextNode('\n '));
       }
     }
 
-    // 오른쪽 창 입력 이벤트 (타이핑 중 왼쪽 즉시 갱신, 400ms 멈추면 오른쪽 초록색 하이라이트 정돈)
-    let typingDebounce = null;
-    revisedView.addEventListener('input', () => {
-      autoSave();
-      updateDiff(true); // 타이핑 중에는 커서 튐 없이 왼쪽 원본 빨간색 즉각 표시
-
-      clearTimeout(typingDebounce);
-      typingDebounce = setTimeout(() => {
-        updateDiff(false); // 입력이 잠시 멈추면 오른쪽에 정밀 초록색 하이라이트 씌움
-      }, 400);
+    // 오른쪽 입력창 스크롤과 백드롭 스크롤 일치화
+    revisedInput.addEventListener('scroll', () => {
+      revisedBackdrop.scrollTop = revisedInput.scrollTop;
+      revisedBackdrop.scrollLeft = revisedInput.scrollLeft;
     });
 
-    // 원본 직접 수정 모드 토글
+    // 한글 입력 중(isComposing)에도 안전하게 렌더링
+    revisedInput.addEventListener('input', () => {
+      autoSave();
+      updateDiff();
+    });
+
+    originalInput.addEventListener('input', () => {
+      autoSave();
+      updateDiff();
+    });
+
     function toggleEditOriginal() {
       if (originalInput.style.display === 'none') {
         originalInput.style.display = 'block';
@@ -464,18 +441,12 @@
         originalView.style.display = 'block';
         btnEditMode.textContent = '원본 직접 수정';
         autoSave();
-        updateDiff(false);
+        updateDiff();
       }
     }
 
-    originalInput.addEventListener('input', () => {
-      autoSave();
-      updateDiff(false);
-    });
-
-    // 최종본 복사하기
     function copyRevisedText() {
-      const textToCopy = getEditorText(revisedView);
+      const textToCopy = revisedInput.value;
       if (!textToCopy.trim()) {
         alert("복사할 내용이 없습니다.");
         return;
@@ -488,11 +459,7 @@
           btnCopy.classList.remove("copied");
         }, 2000);
       }).catch(() => {
-        const range = document.createRange();
-        range.selectNodeContents(revisedView);
-        const sel = window.getSelection();
-        sel.removeAllRanges();
-        sel.addRange(range);
+        revisedInput.select();
         document.execCommand('copy');
         btnCopy.textContent = "✓ 복사 완료!";
         setTimeout(() => {
@@ -501,7 +468,6 @@
       });
     }
 
-    // 버전 저장 (히스토리 아카이브)
     function saveToHistory() {
       const titlePrompt = prompt("이 대본의 버전 제목을 입력하세요:", `버전 ${new Date().toLocaleTimeString('ko-KR')}`);
       if (!titlePrompt) return;
@@ -512,7 +478,7 @@
         title: titlePrompt,
         date: new Date().toLocaleString('ko-KR'),
         original: originalInput.value,
-        revised: getEditorText(revisedView)
+        revised: revisedInput.value
       };
 
       historyData.unshift(newItem);
@@ -555,9 +521,9 @@
       const target = historyData.find(item => item.id === id);
       if (target) {
         originalInput.value = target.original;
-        setEditorText(revisedView, target.revised);
+        revisedInput.value = target.revised;
         autoSave();
-        updateDiff(false);
+        updateDiff();
         toggleDrawer(false);
       }
     };
@@ -583,9 +549,9 @@
     function resetAll() {
       if (!confirm("현재 작업 중인 대본을 모두 비우고 초기화하시겠습니까?")) return;
       originalInput.value = "";
-      revisedView.innerHTML = "";
+      revisedInput.value = "";
       autoSave();
-      updateDiff(false);
+      updateDiff();
       if (originalInput.style.display === 'none') {
         toggleEditOriginal();
       }
@@ -612,28 +578,27 @@
     originalView.addEventListener('scroll', () => {
       if (isSyncingLeft) { isSyncingLeft = false; return; }
       isSyncingRight = true;
-      syncScroll(getActiveLeftElement(), revisedView);
+      syncScroll(getActiveLeftElement(), revisedInput);
     });
 
     originalInput.addEventListener('scroll', () => {
       if (isSyncingLeft) { isSyncingLeft = false; return; }
       isSyncingRight = true;
-      syncScroll(getActiveLeftElement(), revisedView);
+      syncScroll(getActiveLeftElement(), revisedInput);
     });
 
-    revisedView.addEventListener('scroll', () => {
+    revisedInput.addEventListener('scroll', () => {
       if (isSyncingRight) { isSyncingRight = false; return; }
       isSyncingLeft = true;
-      syncScroll(revisedView, getActiveLeftElement());
+      syncScroll(revisedInput, getActiveLeftElement());
     });
 
     function escapeHtml(str) {
       return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
     }
 
-    // 구동 시작
     loadCurrentWork();
-    updateDiff(false);
+    updateDiff();
   </script>
 
 </body>
